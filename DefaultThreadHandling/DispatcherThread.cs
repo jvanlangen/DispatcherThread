@@ -13,6 +13,9 @@ public class DispatcherThread : IDisposable
 
     public EventHandler<ThreadExceptionEventArgs>? OnUnhandledException;
 
+    public DispatcherThread() => 
+        Start();
+
     public void Start()
     {
         lock (this)
