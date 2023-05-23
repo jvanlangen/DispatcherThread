@@ -41,6 +41,8 @@ public class DispatcherThread : IDisposable
     /// </summary>
     public bool Running { get { lock (this) return _task != null; } }
 
+    private const int MaxBatchSize = 8;
+
     /// <summary>
     /// Constructor starts the thread automatically.
     /// </summary>
@@ -163,16 +165,7 @@ public class DispatcherThread : IDisposable
         // which is _terminating
         while (EventWaitHandle.WaitAny(handles) != 0)
         {
-            List<Action> actionsToProcess;
-
-            lock (_actionQueue)
-            {
-                if (_actionQueue.Count == 0)
-                    continue;
-
-                actionsToProcess = new List<Action>(_actionQueue);
-                _actionQueue.Clear();
-            }
+            List<Action> actionsToProcess = DequeueActions();
 
             foreach (var action in actionsToProcess)
             {
@@ -193,6 +186,22 @@ public class DispatcherThread : IDisposable
                 }
             }
         }
+    }
+
+    private List<Action> DequeueActions()
+    {
+        List<Action> actions = new List<Action>();
+        lock (_actionQueue)
+        {
+            int count = Math.Min(_actionQueue.Count, MaxBatchSize);
+            actions.AddRange(_actionQueue.GetRange(0, count));
+            _actionQueue.RemoveRange(0, count);
+
+            if (_actionQueue.Count > 0)
+                _actionAdded.Set();
+        }
+
+        return actions;
     }
 
     /// <summary>
