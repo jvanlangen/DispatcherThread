@@ -6,7 +6,7 @@ public class DispatcherThread : IDisposable
 {
     private readonly ConcurrentQueue<Action> _actionQueue = new();
     private readonly ManualResetEvent _terminating = new(false);
-    private readonly ManualResetEvent _actionAdded = new(false);
+    private readonly AutoResetEvent _actionAdded = new(false);
     private Task? _task;
 
     public bool Running { get { lock (this) return _task != null; } }
