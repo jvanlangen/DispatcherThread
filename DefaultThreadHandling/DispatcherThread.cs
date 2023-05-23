@@ -6,6 +6,8 @@ using System.Diagnostics;
 /// </summary>
 public class DispatcherThread : IDisposable
 {
+    private const int MaxBatchSize = 8;
+
     /// <summary>
     /// The default synchronization context used when no specific context is captured.
     /// </summary>
@@ -40,8 +42,6 @@ public class DispatcherThread : IDisposable
     /// Property to check if the thread is currently running.
     /// </summary>
     public bool Running { get { lock (this) return _task != null; } }
-
-    private const int MaxBatchSize = 8;
 
     /// <summary>
     /// Constructor starts the thread automatically.
