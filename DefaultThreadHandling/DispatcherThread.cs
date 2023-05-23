@@ -1,21 +1,55 @@
-﻿// See https://aka.ms/new-console-template for more information
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 
+/// <summary>
+/// Represents a dispatcher thread that executes actions asynchronously on a separate thread.
+/// </summary>
 public class DispatcherThread : IDisposable
 {
+    /// <summary>
+    /// The default synchronization context used when no specific context is captured.
+    /// </summary>
+    private static readonly SynchronizationContext _defaultSynchronizationContext = new();
+
+    /// <summary>
+    /// Queue to hold actions to be executed on the separate thread.
+    /// </summary>
     private readonly ConcurrentQueue<Action> _actionQueue = new();
+
+    /// <summary>
+    /// ManualResetEvent to indicate whether the thread is terminating.
+    /// </summary>
     private readonly ManualResetEvent _terminating = new(false);
+
+    /// <summary>
+    /// AutoResetEvent to signal that an action has been added to the queue.
+    /// </summary>
     private readonly AutoResetEvent _actionAdded = new(false);
+
+    /// <summary>
+    /// The running task on the separate thread.
+    /// </summary>
     private Task? _task;
 
-    public bool Running { get { lock (this) return _task != null; } }
-
+    /// <summary>
+    /// Event handler for unhandled exceptions during action execution.
+    /// </summary>
     public EventHandler<ThreadExceptionEventArgs>? OnUnhandledException;
 
-    public DispatcherThread() => 
+    /// <summary>
+    /// Property to check if the thread is currently running.
+    /// </summary>
+    public bool Running { get { lock (this) return _task != null; } }
+
+    /// <summary>
+    /// Constructor starts the thread automatically.
+    /// </summary>
+    public DispatcherThread() =>
         Start();
 
+    /// <summary>
+    /// Starts the main loop on the separate thread.
+    /// </summary>
     public void Start()
     {
         lock (this)
@@ -29,6 +63,9 @@ public class DispatcherThread : IDisposable
         }
     }
 
+    /// <summary>
+    /// Stops the main loop and waits for the thread to complete.
+    /// </summary>
     public void Stop()
     {
         lock (this)
@@ -42,23 +79,31 @@ public class DispatcherThread : IDisposable
         }
     }
 
+    /// <summary>
+    /// Executes an action asynchronously and returns a Task to track its completion.
+    /// </summary>
+    /// <param name="action">The action to execute.</param>
+    /// <returns>A Task representing the asynchronous execution of the action.</returns>
     public Task Invoke(Action action)
     {
-        TaskCompletionSource taskCompletionSource = new();
-
+        // Capture the current SynchronizationContext.
         var context = SynchronizationContext.Current;
 
+        TaskCompletionSource taskCompletionSource = new();
+
+        // Add an action to the queue.
         AddAction(() =>
         {
             try
             {
                 action();
 
+                // Invoke the task completion on the captured context.
                 InvokeOnContext(context, () => taskCompletionSource.SetResult());
-
             }
             catch (Exception ex)
             {
+                // If an exception occurs, invoke the exception handling on the captured context.
                 InvokeOnContext(context, () => taskCompletionSource.SetException(ex));
             }
         });
@@ -66,11 +111,17 @@ public class DispatcherThread : IDisposable
         return taskCompletionSource.Task;
     }
 
+    /// <summary>
+    /// Executes a function asynchronously and returns a Task with the result.
+    /// </summary>
+    /// <typeparam name="T">The type of the function result.</typeparam>
+    /// <param name="func">The function to execute.</param>
+    /// <returns>A Task representing the asynchronous execution of the function with the result.</returns>
     public Task<T> Invoke<T>(Func<T> func)
     {
-        TaskCompletionSource<T> taskCompletionSource = new();
-
         var context = SynchronizationContext.Current;
+
+        TaskCompletionSource<T> taskCompletionSource = new();
 
         AddAction(() =>
         {
@@ -88,6 +139,9 @@ public class DispatcherThread : IDisposable
         return taskCompletionSource.Task;
     }
 
+    /// <summary>
+    /// Disposes the DispatcherThread object.
+    /// </summary>
     public void Dispose()
     {
         lock (this)
@@ -99,6 +153,9 @@ public class DispatcherThread : IDisposable
         }
     }
 
+    /// <summary>
+    /// The main loop that runs on the separate thread.
+    /// </summary>
     private void MainLoop()
     {
         var handles = new EventWaitHandle[] { _terminating, _actionAdded };
@@ -123,19 +180,23 @@ public class DispatcherThread : IDisposable
                 }
     }
 
+    /// <summary>
+    /// Adds an action to the queue and sets the trigger.
+    /// </summary>
+    /// <param name="action">The action to add to the queue.</param>
     private void AddAction(Action action)
     {
         _actionQueue.Enqueue(action);
         _actionAdded.Set();
     }
 
-    private void InvokeOnContext(SynchronizationContext? context, Action action)
-    {
-        // if there wasn't a SynchronizationContext, use the ThreadPool.
-        // Avoid continueing on this thread.
-        if (context != null)
-            context.Post(state => action(), null);
-        else
-            ThreadPool.QueueUserWorkItem(state => action(), null);
-    }
+    /// <summary>
+    /// Invokes an action on the specified synchronization context.
+    /// If the context is not captured, the default (ThreadPool) context is used.
+    /// </summary>
+    /// <param name="context">The synchronization context to invoke the action on.</param>
+    /// <param name="action">The action to invoke.</param>
+    private void InvokeOnContext(SynchronizationContext? context, Action action) =>
+        // if there wasn't a context captured, use the default (ThreadPool)
+        (context ?? _defaultSynchronizationContext).Post(s => action(), null);
 }
