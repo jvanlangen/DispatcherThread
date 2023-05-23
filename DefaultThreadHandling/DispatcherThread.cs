@@ -14,7 +14,7 @@ public class DispatcherThread : IDisposable
     /// <summary>
     /// Queue to hold actions to be executed on the separate thread.
     /// </summary>
-    private readonly ConcurrentQueue<Action> _actionQueue = new();
+    private readonly List<Action> _actionQueue = new();
 
     /// <summary>
     /// ManualResetEvent to indicate whether the thread is terminating.
@@ -59,7 +59,7 @@ public class DispatcherThread : IDisposable
 
             _terminating.Reset();
 
-            _task = Task.Factory.StartNew(MainLoop, TaskCreationOptions.LongRunning);
+            _task = Task.Run(MainLoop);
         }
     }
 
@@ -162,7 +162,20 @@ public class DispatcherThread : IDisposable
         // wait on any handle, loop until the WaitAny returns a 0 as index.
         // which is _terminating
         while (EventWaitHandle.WaitAny(handles) != 0)
-            while (_actionQueue.TryDequeue(out var action))
+        {
+            List<Action> actionsToProcess;
+
+            lock (_actionQueue)
+            {
+                if (_actionQueue.Count == 0)
+                    continue;
+
+                actionsToProcess = new List<Action>(_actionQueue);
+                _actionQueue.Clear();
+            }
+
+            foreach (var action in actionsToProcess)
+            {
                 try
                 {
                     action();
@@ -178,6 +191,8 @@ public class DispatcherThread : IDisposable
                         Trace.TraceError(ex2.ToString());
                     }
                 }
+            }
+        }
     }
 
     /// <summary>
@@ -186,7 +201,9 @@ public class DispatcherThread : IDisposable
     /// <param name="action">The action to add to the queue.</param>
     private void AddAction(Action action)
     {
-        _actionQueue.Enqueue(action);
+        lock(_actionQueue)
+            _actionQueue.Add(action);
+
         _actionAdded.Set();
     }
 
