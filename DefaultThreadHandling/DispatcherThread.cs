@@ -161,11 +161,12 @@ public class DispatcherThread : IDisposable
     private void MainLoop()
     {
         var handles = new EventWaitHandle[] { _terminating, _actionAdded };
+
         // wait on any handle, loop until the WaitAny returns a 0 as index.
         // which is _terminating
         while (EventWaitHandle.WaitAny(handles) != 0)
         {
-            List<Action> actionsToProcess = DequeueActions();
+            var actionsToProcess = DequeueActions();
 
             foreach (var action in actionsToProcess)
             {
@@ -188,9 +189,14 @@ public class DispatcherThread : IDisposable
         }
     }
 
+    /// <summary>
+    /// Dequeues actions from the action list in batches.
+    /// </summary>
+    /// <returns>A list of actions dequeued from the action list.</returns>
     private List<Action> DequeueActions()
     {
-        List<Action> actions = new List<Action>();
+        List<Action> actions = new();
+
         lock (_actionQueue)
         {
             int count = Math.Min(_actionQueue.Count, MaxBatchSize);
