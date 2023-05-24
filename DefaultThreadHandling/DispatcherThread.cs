@@ -94,7 +94,7 @@ public class DispatcherThread : IDisposable
         TaskCompletionSource taskCompletionSource = new();
 
         // Add an action to the queue.
-        AddAction(() =>
+        QueueAction(() =>
         {
             try
             {
@@ -119,13 +119,81 @@ public class DispatcherThread : IDisposable
     /// <typeparam name="T">The type of the function result.</typeparam>
     /// <param name="func">The function to execute.</param>
     /// <returns>A Task representing the asynchronous execution of the function with the result.</returns>
+    public Task<T> Invoke<T>(Func<Task<T>> func)
+    {
+        var context = SynchronizationContext.Current;
+
+        TaskCompletionSource<T> taskCompletionSource = new();
+
+        //QueueAction(() =>
+        //{
+        //    func().ContinueWith(tsk =>
+        //    {
+        //        if (tsk.Exception == null)
+        //            taskCompletionSource.SetResult(tsk.Result);
+        //        else
+        //            taskCompletionSource.SetException(tsk.Exception);
+        //    });
+        //});
+        QueueAction(func().ContinueWith(tsk =>
+            {
+                if (tsk.Exception == null)
+                    taskCompletionSource.SetResult(tsk.Result);
+                else
+                    taskCompletionSource.SetException(tsk.Exception);
+            }).Wait);
+
+        return taskCompletionSource.Task;
+    }
+
+    /// <summary>
+    /// Executes a function asynchronously and returns a Task with the result.
+    /// </summary>
+    /// <typeparam name="T">The type of the function result.</typeparam>
+    /// <param name="func">The function to execute.</param>
+    /// <returns>A Task representing the asynchronous execution of the function with the result.</returns>
+    public Task Invoke(Func<Task> action)
+    {
+        var context = SynchronizationContext.Current;
+
+        TaskCompletionSource taskCompletionSource = new();
+
+        QueueAction(
+            action().ContinueWith(tsk =>
+            {
+                if (tsk.Exception == null)
+                    taskCompletionSource.SetResult();
+                else
+                    taskCompletionSource.SetException(tsk.Exception);
+            }).Wait);
+
+        //QueueAction(() =>
+        //{
+        //    action().ContinueWith(tsk =>
+        //    {
+        //        if (tsk.Exception == null)
+        //            taskCompletionSource.SetResult();
+        //        else
+        //            taskCompletionSource.SetException(tsk.Exception);
+        //    });
+        //});
+
+        return taskCompletionSource.Task;
+    }
+
+    /// <summary>
+    /// Executes a function asynchronously and returns a Task with the result.
+    /// </summary>
+    /// <typeparam name="T">The type of the function result.</typeparam>
+    /// <param name="func">The function to execute.</param>
+    /// <returns>A Task representing the asynchronous execution of the function with the result.</returns>
     public Task<T> Invoke<T>(Func<T> func)
     {
         var context = SynchronizationContext.Current;
 
         TaskCompletionSource<T> taskCompletionSource = new();
 
-        AddAction(() =>
+        QueueAction(() =>
         {
             try
             {
@@ -176,13 +244,19 @@ public class DispatcherThread : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    try
+                    var handlers = OnUnhandledException?.GetInvocationList();
+                    if (handlers != default)
                     {
-                        OnUnhandledException?.Invoke(this, new ThreadExceptionEventArgs(ex));
-                    }
-                    catch (Exception ex2)
-                    {
-                        Trace.TraceError(ex2.ToString());
+                        var args = new ThreadExceptionEventArgs(ex);
+                        foreach (var handler in handlers.OfType<EventHandler<ThreadExceptionEventArgs>>())
+                            try
+                            {
+                                handler(this, args);
+                            }
+                            catch (Exception ex2)
+                            {
+                                Trace.TraceError(ex2.ToString());
+                            }
                     }
                 }
             }
@@ -214,9 +288,9 @@ public class DispatcherThread : IDisposable
     /// Adds an action to the queue and sets the trigger.
     /// </summary>
     /// <param name="action">The action to add to the queue.</param>
-    private void AddAction(Action action)
+    private void QueueAction(Action action)
     {
-        lock(_actionQueue)
+        lock (_actionQueue)
             _actionQueue.Add(action);
 
         _actionAdded.Set();

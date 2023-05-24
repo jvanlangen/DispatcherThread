@@ -7,7 +7,11 @@ Console.WriteLine($"Main: {Thread.CurrentThread.ManagedThreadId}");
 DispatcherThread thread = new DispatcherThread();
 
 
-await thread.Invoke(() => Console.WriteLine($"Test: {Thread.CurrentThread.ManagedThreadId}"));
+var res = await thread.Invoke(async () => {
+    await Task.Delay(1000);
+    Console.WriteLine($"Test: {Thread.CurrentThread.ManagedThreadId}");
+    return "blabla";
+    });
 await thread.Invoke(() => Console.WriteLine($"Test2: {Thread.CurrentThread.ManagedThreadId}"));
 
 
