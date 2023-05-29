@@ -10,9 +10,9 @@ namespace PWR.Common.Threading
     /// <summary>
     /// Represents an asynchronous thread that runs a message loop for executing actions asynchronously.
     /// </summary>
-    public sealed class ASyncThread : IDisposable
+    public sealed class SingleThread : IDisposable
     {
-        private readonly ASyncThreadLoop _mainLoop;
+        private readonly ThreadLoop _mainLoop;
         private readonly Task _mainTask;
         private readonly Thread _thread;
 
@@ -26,11 +26,11 @@ namespace PWR.Common.Threading
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ASyncThread"/> class.
+        /// Initializes a new instance of the <see cref="SingleThread"/> class.
         /// </summary>
-        public ASyncThread()
+        public SingleThread()
         {
-            _mainLoop = new ASyncThreadLoop();
+            _mainLoop = new ThreadLoop();
 
             using (ManualResetEvent threadStarted = new(false))
             {
@@ -39,8 +39,11 @@ namespace PWR.Common.Threading
                 // Create the thread using Task.Factory.StartNew with TaskCreationOptions.LongRunning.
                 _mainTask = Task.Factory.StartNew(() =>
                     {
+                        // assign the local thread variable, to capture the loop-thread reference.
                         thread = Thread.CurrentThread;
+                        // Signal a ready.
                         threadStarted.Set();
+                        // run the mainloop.
                         _mainLoop.Run();
                     },
                     CancellationToken.None,
@@ -49,6 +52,7 @@ namespace PWR.Common.Threading
 
                 threadStarted.WaitOne();
 
+                // assign the captured thread variable to a field.
                 _thread = thread!;
             }
         }

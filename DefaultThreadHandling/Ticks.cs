@@ -33,8 +33,11 @@ namespace PWR.Common
             new Ticks(ToStopwatchTicks(timeSpan.Ticks));
 
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
+            if(obj == default)
+                return false;
+
             if (!(obj is Ticks))
                 return false;
 
@@ -47,8 +50,10 @@ namespace PWR.Common
             return -1937169414 + Value.GetHashCode();
         }
 
-        public int CompareTo(object obj)
+        public int CompareTo(object? obj)
         {
+            if(obj == default)
+                return -1;
             if (obj is Ticks ticksObj)
                 return Value.CompareTo(ticksObj.Value);
             else if (obj is long longValue)

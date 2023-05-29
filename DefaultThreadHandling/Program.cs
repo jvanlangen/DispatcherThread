@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 Console.WriteLine($"Main: {Thread.CurrentThread.ManagedThreadId}");
 
 
-ASyncThread thread = new();
-ASyncThread thread2 = new();
+SingleThread thread = new();
+SingleThread thread2 = new();
 thread.ThreadName = "BLABLA";
 
 thread2.Post(() => Console.WriteLine($"Pino: {Environment.CurrentManagedThreadId}"));
@@ -29,7 +29,7 @@ await thread.SendAsync(TimeSpan.FromSeconds(2), () =>
     Console.WriteLine($"Test2: {Environment.CurrentManagedThreadId}");
 });
 
-await thread.SendAsync(async () =>
+await thread.SendAsync(() =>
 {
     Console.WriteLine($"Test3: {Environment.CurrentManagedThreadId}");
 });

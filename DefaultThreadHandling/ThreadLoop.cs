@@ -9,7 +9,7 @@ namespace PWR.Common.Threading
     /// <summary>
     /// Represents an asynchronous thread loop.
     /// </summary>
-    public sealed class ASyncThreadLoop : IDisposable
+    public sealed class ThreadLoop : IDisposable
     {
         private static readonly Stopwatch _stopwatch = Stopwatch.StartNew();
 
@@ -19,11 +19,11 @@ namespace PWR.Common.Threading
 
         private static readonly Ticks ZeroTicks = Ticks.FromTimeSpan(TimeSpan.Zero);
         private readonly ManualResetEvent _terminateEvent = new(false);
-        private static readonly SynchronizationContext threadPoolSynchronizationContext = new();
+        private static readonly SynchronizationContext _threadPoolSynchronizationContext = new();
         private int _currentThreadId;
 
         [ThreadStatic]
-        private static ASyncThreadLoop? _current;
+        private static ThreadLoop? _current;
 
         private readonly AutoResetEvent _actionAdded = new(false);
         private readonly List<ActionWithState> _itemBuffer = new();
@@ -32,9 +32,9 @@ namespace PWR.Common.Threading
 
         private class ASyncThreadSynchronizationContext : SynchronizationContext
         {
-            private readonly ASyncThreadLoop _threadLoop;
+            private readonly ThreadLoop _threadLoop;
 
-            public ASyncThreadSynchronizationContext(ASyncThreadLoop threadLoop) =>
+            public ASyncThreadSynchronizationContext(ThreadLoop threadLoop) =>
                 _threadLoop = threadLoop;
 
             public override void Post(SendOrPostCallback d, object? state) =>
@@ -144,7 +144,7 @@ namespace PWR.Common.Threading
         }
 
         /// <summary>
-        /// Releases all resources used by the <see cref="ASyncThreadLoop"/> instance.
+        /// Releases all resources used by the <see cref="ThreadLoop"/> instance.
         /// </summary>
         public void Dispose()
         {
@@ -214,7 +214,7 @@ namespace PWR.Common.Threading
 
             var tcs = new TaskCompletionSource();
 
-            var returnContext = SynchronizationContext.Current ?? threadPoolSynchronizationContext;
+            var returnContext = SynchronizationContext.Current ?? _threadPoolSynchronizationContext;
 
             Post(executionDelay, _ =>
             {
@@ -256,7 +256,7 @@ namespace PWR.Common.Threading
 
             var tcs = new TaskCompletionSource();
 
-            var returnContext = SynchronizationContext.Current ?? threadPoolSynchronizationContext;
+            var returnContext = SynchronizationContext.Current ?? _threadPoolSynchronizationContext;
 
             Post(executionDelay, async _ =>
             {
@@ -300,7 +300,8 @@ namespace PWR.Common.Threading
 
             var tcs = new TaskCompletionSource<T>();
             
-            var returnContext = SynchronizationContext.Current ?? threadPoolSynchronizationContext;
+            // capture the return context, if none continue the awaiter on a threadpool thread. It should keep this thread clean.
+            var returnContext = SynchronizationContext.Current ?? _threadPoolSynchronizationContext;
 
             Post(executionDelay, async _ =>
             {
@@ -349,9 +350,9 @@ namespace PWR.Common.Threading
         }
 
         /// <summary>
-        /// Gets the current <see cref="ASyncThreadLoop"/> instance associated with the current thread.
+        /// Gets the current <see cref="ThreadLoop"/> instance associated with the current thread.
         /// </summary>
-        public static ASyncThreadLoop? Current => _current;
+        public static ThreadLoop? Current => _current;
 
         /// <summary>
         /// Occurs when an unhandled exception is encountered in the asynchronous thread loop.
