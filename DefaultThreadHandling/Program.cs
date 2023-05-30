@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 Console.WriteLine($"Main: {Thread.CurrentThread.ManagedThreadId}");
 
 
-SingleThread thread = new();
-SingleThread thread2 = new();
+WorkerThread thread = new();
+WorkerThread thread2 = new();
 thread.ThreadName = "BLABLA";
 
 thread2.Post(() => Console.WriteLine($"Pino: {Environment.CurrentManagedThreadId}"));

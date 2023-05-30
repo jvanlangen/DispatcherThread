@@ -10,7 +10,7 @@ namespace PWR.Common.Threading
     /// <summary>
     /// Represents an asynchronous thread that runs a message loop for executing actions asynchronously.
     /// </summary>
-    public sealed class SingleThread : IDisposable
+    public sealed class WorkerThread : IDisposable
     {
         private readonly ThreadLoop _mainLoop;
         private readonly Task _mainTask;
@@ -26,9 +26,9 @@ namespace PWR.Common.Threading
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="SingleThread"/> class.
+        /// Initializes a new instance of the <see cref="WorkerThread"/> class.
         /// </summary>
-        public SingleThread()
+        public WorkerThread()
         {
             _mainLoop = new ThreadLoop();
 
